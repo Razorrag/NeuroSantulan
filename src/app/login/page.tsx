@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import Link from "next/link";
+import { AuthService } from "@/lib/auth";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -12,7 +14,11 @@ export default function LoginPage() {
   const [passwordStrength, setPasswordStrength] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const containerRef = useRef(null);
+  const router = useRouter();
 
   const checkStrength = (pass: string) => {
     let strength = 0;
@@ -30,10 +36,88 @@ export default function LoginPage() {
     checkStrength(val);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      setError("Please enter your email address");
+      return;
+    }
+
+    setIsLoading(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const result = await AuthService.resetPassword(email);
+      if (result.success) {
+        setSuccess("Password reset link sent! Please check your email.");
+        setTimeout(() => {
+          setShowForgotPassword(false);
+          setSuccess("");
+        }, 3000);
+      } else {
+        setError(result.error?.message || "Failed to send reset link");
+      }
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Form submitted:', { email, password, username });
-    alert(`${isLogin ? 'Login' : 'Signup'} functionality would be implemented here`);
+    setError("");
+    setSuccess("");
+    setIsLoading(true);
+
+    try {
+      if (isLogin) {
+        // Login
+        const result = await AuthService.signIn(email, password);
+        if (result.success) {
+          setSuccess("Login successful! Redirecting...");
+          setTimeout(() => {
+            if (result.profile?.role === 'doctor') {
+              router.push('/doctor-dashboard');
+            } else {
+              router.push('/dashboard');
+            }
+          }, 1500);
+        } else {
+          setError(result.error?.message || "Login failed. Please try again.");
+        }
+      } else {
+        // Signup
+        if (!username.trim()) {
+          setError("Please enter your full name");
+          setIsLoading(false);
+          return;
+        }
+        
+        if (passwordStrength < 3) {
+          setError("Please choose a stronger password");
+          setIsLoading(false);
+          return;
+        }
+
+        const result = await AuthService.signUp(email, password, username, 'patient');
+        if (result.success) {
+          setSuccess("Account created! Please check your email to verify.");
+          setTimeout(() => {
+            setIsLogin(true);
+            setUsername("");
+            setPassword("");
+            setPasswordStrength(0);
+          }, 2000);
+        } else {
+          setError(result.error?.message || "Signup failed. Please try again.");
+        }
+      }
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -132,6 +216,19 @@ export default function LoginPage() {
 
               {/* Form */}
               <form className="space-y-6" onSubmit={handleSubmit}>
+                {/* Error and Success Messages */}
+                {error && (
+                  <div className="form-element opacity-0 translate-y-[20px] bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                    <p className="text-sm">{error}</p>
+                  </div>
+                )}
+                
+                {success && (
+                  <div className="form-element opacity-0 translate-y-[20px] bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
+                    <p className="text-sm">{success}</p>
+                  </div>
+                )}
+
                 {!isLogin && (
                   <div className="floating-label-group">
                     <input
@@ -245,9 +342,17 @@ export default function LoginPage() {
 
                 <button
                   type="submit"
-                  className="form-element opacity-0 translate-y-[20px] w-full btn-primary text-lg text-white"
+                  disabled={isLoading}
+                  className="form-element opacity-0 translate-y-[20px] w-full btn-primary text-lg text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
                 >
-                  {isLogin ? "Sign In" : "Create Account"}
+                  {isLoading ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      {isLogin ? "Signing In..." : "Creating Account..."}
+                    </>
+                  ) : (
+                    isLogin ? "Sign In" : "Create Account"
+                  )}
                 </button>
               </form>
 

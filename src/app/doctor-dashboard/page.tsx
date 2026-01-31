@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { gsap } from "gsap";
+import gsap from "gsap";
 import Link from "next/link";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function DoctorDashboard() {
   const containerRef = useRef(null);
@@ -55,7 +57,8 @@ export default function DoctorDashboard() {
 
 
   return (
-    <div ref={containerRef} className="min-h-screen abstract-bg relative overflow-hidden">
+    <ProtectedRoute allowedRoles={['doctor']}>
+      <div ref={containerRef} className="min-h-screen abstract-bg relative overflow-hidden">
       {/* Abstract Background Shapes */}
       <div className="abstract-shape w-96 h-96 bg-gradient-to-br from-orange-400 to-orange-600 top-20 -left-48"></div>
       <div className="abstract-shape w-80 h-80 bg-gradient-to-br from-purple-blue-400 to-purple-blue-600 top-1/3 -right-40"></div>
@@ -258,6 +261,7 @@ export default function DoctorDashboard() {
           <span className="text-[10px] font-medium">Settings</span>
         </Link>
       </div>
-    </div>
+      </div>
+    </ProtectedRoute>
   );
 }
