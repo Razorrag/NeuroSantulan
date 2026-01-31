@@ -1,12 +1,12 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import LoginPage from '../src/app/login/page';
 
-// Mock GSAP completely
+// Mock GSAP at the module level
 jest.mock('gsap', () => ({
-  context: jest.fn(() => ({
+  context: jest.fn().mockReturnValue({
     to: jest.fn(),
     revert: jest.fn(),
-  })),
+  }),
   to: jest.fn(),
   registerPlugin: jest.fn(),
 }));
