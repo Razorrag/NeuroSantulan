@@ -3,9 +3,15 @@
 import { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Brain, Check, Eye, EyeOff, Lock } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
 function ResetPasswordForm() {
+  // Initialize Supabase client
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+  
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPasswords, setShowPasswords] = useState({ new: false, confirm: false });

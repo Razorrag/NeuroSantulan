@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, Brain, Calendar, CheckCircle2, Clock3, FileText, LogOut, Plus, Settings, Target, User, X } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
 interface Appointment {
   id: string;
@@ -29,6 +29,12 @@ interface TreatmentPlan {
 export default function ProfilePage() {
   const { user, userProfile, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
+
+  // Initialize Supabase client
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);

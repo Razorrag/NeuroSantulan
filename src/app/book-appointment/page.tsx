@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Calendar, Check, Clock3, FileText, Stethoscope } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
 interface Service {
   id: string;
@@ -18,6 +18,12 @@ interface Service {
 export default function BookAppointmentPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+
+  // Initialize Supabase client
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
 
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);

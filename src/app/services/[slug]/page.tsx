@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Brain, Calendar, Check, Clock3, Stethoscope } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 import { useAuth } from '@/lib/auth-context';
 
 interface Service {
@@ -21,6 +21,12 @@ export default function ServiceDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
+
+  // Initialize Supabase client
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
   
   const [service, setService] = useState<Service | null>(null);
   const [loading, setLoading] = useState(true);
