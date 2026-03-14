@@ -29,7 +29,12 @@ export default function LoginPage() {
       return;
     }
 
-    router.push('/profile');
+    // Check if user is admin and redirect accordingly
+    if (userProfile?.role === 'admin') {
+      router.push('/admin');
+    } else {
+      router.push('/profile');
+    }
   };
 
   return (
