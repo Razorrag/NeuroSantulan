@@ -39,8 +39,11 @@ export default function BookAppointmentPage() {
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login');
+    } else if (!authLoading && user && userProfile?.role === 'admin') {
+      // Redirect admin users to admin dashboard
+      router.push('/admin');
     }
-  }, [user, authLoading, router]);
+  }, [user, userProfile, authLoading, router]);
 
   const fetchServices = useCallback(async () => {
     const { data, error } = await supabase.from('services').select('*').eq('is_active', true).order('name');

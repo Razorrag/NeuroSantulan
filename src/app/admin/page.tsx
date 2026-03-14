@@ -73,10 +73,14 @@ export default function AdminPage() {
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
+    // Wait for auth to load AND userProfile to be available
     if (!authLoading && !user) {
       router.push('/login');
-    } else if (!authLoading && user && userProfile?.role !== 'admin') {
-      router.push('/profile');
+    } else if (!authLoading && user && userProfile) {
+      // Only redirect if userProfile is loaded and user is NOT admin
+      if (userProfile.role !== 'admin') {
+        router.push('/profile');
+      }
     }
   }, [user, userProfile, authLoading, router]);
 

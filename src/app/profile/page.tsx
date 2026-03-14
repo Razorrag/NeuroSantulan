@@ -44,8 +44,11 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login');
+    } else if (!authLoading && user && userProfile?.role === 'admin') {
+      // Redirect admin users to admin dashboard
+      router.push('/admin');
     }
-  }, [user, authLoading, router]);
+  }, [user, userProfile, authLoading, router]);
 
   const fetchAppointments = useCallback(async () => {
     if (!user) {
@@ -209,6 +212,12 @@ export default function ProfilePage() {
                   <Settings className="h-4 w-4" />
                   Edit profile
                 </Link>
+                {userProfile?.role === 'admin' && (
+                  <Link href="/admin" className="secondary-button">
+                    <Brain className="h-4 w-4" />
+                    Admin dashboard
+                  </Link>
+                )}
               </div>
             </div>
 
