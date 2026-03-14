@@ -1,22 +1,8 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react'
-import { createClient, User, SupabaseClient } from '@supabase/supabase-js'
-
-// Initialize Supabase client only on client-side
-const initSupabase = () => {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  
-  if (!url || !key) {
-    console.warn('Supabase credentials not available')
-    return null
-  }
-  
-  return createClient(url, key)
-}
-
-let supabase: SupabaseClient | null = null
+import { User } from '@supabase/supabase-js'
+import { supabase as supabaseLib } from '@/lib/supabase'
 
 interface AuthContextType {
   user: User | null
@@ -56,14 +42,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Initialize Supabase on mount (client-side only)
-  useEffect(() => {
-    if (!supabase) {
-      supabase = initSupabase() as any
-    }
+  // Get Supabase instance helper
+  const getSupabase = useCallback(() => {
+    return supabaseLib.getInstance()
   }, [])
 
   const fetchUserProfile = useCallback(async (userId: string) => {
+    const supabase = getSupabase()
     if (!supabase) {
       setLoading(false)
       return
@@ -79,9 +64,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUserProfile(data)
     }
     setLoading(false)
-  }, [])
+  }, [getSupabase])
 
   useEffect(() => {
+    const supabase = getSupabase()
     if (!supabase) {
       setLoading(false)
       return
@@ -107,9 +93,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
 
     return () => subscription.unsubscribe()
-  }, [fetchUserProfile])
+  }, [fetchUserProfile, getSupabase])
 
   const signIn = async (email: string, password: string) => {
+    const supabase = getSupabase()
     if (!supabase) {
       return { error: new Error('Supabase not initialized') }
     }
@@ -122,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signUp = async (userData: SignUpData) => {
+    const supabase = getSupabase()
     if (!supabase) {
       return { error: new Error('Supabase not initialized') }
     }
@@ -144,7 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Create user profile in database
     if (data.user) {
-      const { error: profileError } = await supabase!.from('users').insert({
+      const { error: profileError } = await supabase.from('users').insert({
         id: data.user.id,
         email: userData.email,
         username: userData.username,
@@ -162,6 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signOut = async () => {
+    const supabase = getSupabase()
     if (!supabase) return
     await supabase.auth.signOut()
     setUser(null)
@@ -169,6 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const resetPassword = async (email: string) => {
+    const supabase = getSupabase()
     if (!supabase) {
       return { error: new Error('Supabase not initialized') }
     }
