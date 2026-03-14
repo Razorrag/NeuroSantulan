@@ -30,41 +30,55 @@ export default function ServiceDetailPage() {
   
   const [service, setService] = useState<Service | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const slug = params.slug as string;
 
   const fetchService = useCallback(async () => {
     if (!slug) return;
 
-    // Decode the slug (replace hyphens with spaces for matching)
-    const serviceName = slug.split('-').map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(' ');
+    setLoading(true);
+    setError(null);
 
-    const { data, error } = await supabase
-      .from('services')
-      .select('*')
-      .ilike('name', serviceName)
-      .eq('is_active', true)
-      .single();
+    try {
+      // Decode the slug (replace hyphens with spaces for matching)
+      const serviceName = slug.split('-').map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1)
+      ).join(' ');
 
-    if (!error && data) {
-      setService(data);
-    } else {
-      // Try to find by partial match
-      const { data: searchData } = await supabase
+      const { data, error: fetchError } = await supabase
         .from('services')
         .select('*')
-        .ilike('name', `%${slug}%`)
+        .ilike('name', serviceName)
         .eq('is_active', true)
         .single();
-      
-      if (searchData) {
-        setService(searchData);
-      }
-    }
 
-    setLoading(false);
+      if (fetchError) throw fetchError;
+
+      if (data) {
+        setService(data);
+      } else {
+        // Try to find by partial match
+        const { data: searchData, error: searchError } = await supabase
+          .from('services')
+          .select('*')
+          .ilike('name', `%${slug}%`)
+          .eq('is_active', true)
+          .single();
+        
+        if (searchError) throw searchError;
+        if (searchData) {
+          setService(searchData);
+        } else {
+          setError('Service not found');
+        }
+      }
+    } catch (err: any) {
+      console.error('Error fetching service:', err);
+      setError(err.message || 'Failed to load service');
+    } finally {
+      setLoading(false);
+    }
   }, [slug]);
 
   useEffect(() => {
@@ -92,12 +106,17 @@ export default function ServiceDetailPage() {
     );
   }
 
-  if (!service) {
+  if (error || !service) {
     return (
       <div className="app-shell px-4 py-8 sm:py-10">
         <div className="page-shell">
           <div className="glass-dark rounded-[1.8rem] p-8 text-center">
-            <h1 className="text-2xl font-semibold text-slate-950">Service not found</h1>
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-400/14">
+              <X className="h-7 w-7 text-rose-600" />
+            </div>
+            <h1 className="text-2xl font-semibold text-slate-950">
+              {error || 'Service not found'}
+            </h1>
             <p className="mt-3 text-sm leading-6 text-slate-700">
               The service you&apos;re looking for doesn&apos;t exist or is no longer available.
             </p>

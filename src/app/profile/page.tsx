@@ -75,41 +75,47 @@ export default function ProfilePage() {
   const fetchTreatmentPlan = useCallback(async () => {
     if (!user) return;
 
-    // Get completed appointments to generate a treatment plan
-    const { data: completedAppointments } = await supabase
-      .from('appointments')
-      .select(`
-        *,
-        service:services(name, description)
-      `)
-      .eq('user_id', user.id)
-      .eq('status', 'completed')
-      .order('appointment_date', { ascending: false })
-      .limit(5);
+    try {
+      // Get completed appointments to generate a treatment plan
+      const { data: completedAppointments, error: fetchError } = await supabase
+        .from('appointments')
+        .select(`
+          *,
+          service:services(name, description)
+        `)
+        .eq('user_id', user.id)
+        .eq('status', 'completed')
+        .order('appointment_date', { ascending: false })
+        .limit(5);
 
-    if (completedAppointments && completedAppointments.length > 0) {
-      // Generate treatment plan based on completed sessions
-      
-      setTreatmentPlan({
-        goals: [
-          'Reduce pain and discomfort',
-          'Improve mobility and flexibility',
-          'Strengthen affected areas',
-          'Prevent future injuries',
-        ],
-        exercises: [
-          { name: 'Gentle stretching', frequency: '2-3 times daily', description: 'Focus on affected areas, hold each stretch for 30 seconds' },
-          { name: 'Strengthening exercises', frequency: 'Once daily', description: 'Light resistance exercises as demonstrated in session' },
-          { name: 'Posture correction', frequency: 'Throughout the day', description: 'Maintain proper posture during daily activities' },
-        ],
-        recommendations: [
-          'Apply heat before exercises and ice after activity',
-          'Take short breaks every hour if sitting for long periods',
-          'Stay hydrated and maintain good nutrition',
-          'Get adequate rest for recovery',
-        ],
-        nextMilestone: 'Complete 2 weeks of home exercises before next evaluation',
-      });
+      if (fetchError) throw fetchError;
+
+      if (completedAppointments && completedAppointments.length > 0) {
+        // Generate treatment plan based on completed sessions
+        setTreatmentPlan({
+          goals: [
+            'Reduce pain and discomfort',
+            'Improve mobility and flexibility',
+            'Strengthen affected areas',
+            'Prevent future injuries',
+          ],
+          exercises: [
+            { name: 'Gentle stretching', frequency: '2-3 times daily', description: 'Focus on affected areas, hold each stretch for 30 seconds' },
+            { name: 'Strengthening exercises', frequency: 'Once daily', description: 'Light resistance exercises as demonstrated in session' },
+            { name: 'Posture correction', frequency: 'Throughout the day', description: 'Maintain proper posture during daily activities' },
+          ],
+          recommendations: [
+            'Apply heat before exercises and ice after activity',
+            'Take short breaks every hour if sitting for long periods',
+            'Stay hydrated and maintain good nutrition',
+            'Get adequate rest for recovery',
+          ],
+          nextMilestone: 'Complete 2 weeks of home exercises before next evaluation',
+        });
+      }
+    } catch (err: any) {
+      console.error('Error fetching treatment plan:', err);
+      // Silently fail - treatment plan is optional
     }
   }, [user]);
 

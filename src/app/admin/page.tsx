@@ -122,19 +122,24 @@ export default function AdminPage() {
 
   const updateAppointmentStatus = async (appointmentId: string, status: string) => {
     setUpdating(prev => new Set(prev).add(appointmentId));
-    const { error } = await supabase.from('appointments').update({ status }).eq('id', appointmentId);
     
-    if (error) {
-      toast.error('Failed to update appointment');
-    } else {
+    try {
+      const { error } = await supabase.from('appointments').update({ status }).eq('id', appointmentId);
+      
+      if (error) throw error;
+      
       toast.success(`Appointment ${status}`);
       await fetchData();
+    } catch (err: any) {
+      console.error('Update error:', err);
+      toast.error(err.message || 'Failed to update appointment');
+    } finally {
+      setUpdating(prev => {
+        const next = new Set(prev);
+        next.delete(appointmentId);
+        return next;
+      });
     }
-    setUpdating(prev => {
-      const next = new Set(prev);
-      next.delete(appointmentId);
-      return next;
-    });
   };
 
   const handleBulkUpdate = async (status: string) => {

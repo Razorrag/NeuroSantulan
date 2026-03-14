@@ -68,21 +68,24 @@ export default function BookAppointmentPage() {
 
     setSubmitting(true);
 
-    const { error } = await supabase.from('appointments').insert({
-      user_id: user.id,
-      service_id: formData.service_id,
-      appointment_date: formData.appointment_date,
-      appointment_time: formData.appointment_time,
-      notes: formData.notes || null,
-      status: 'pending',
-    });
+    try {
+      const { error } = await supabase.from('appointments').insert({
+        user_id: user.id,
+        service_id: formData.service_id,
+        appointment_date: formData.appointment_date,
+        appointment_time: formData.appointment_time,
+        notes: formData.notes || null,
+        status: 'pending',
+      });
 
-    if (error) {
+      if (error) throw error;
+
+      setSuccess(true);
+    } catch (err: any) {
+      console.error('Booking error:', err);
+      toast.error(err.message || 'Failed to book appointment. Please try again.');
       setSubmitting(false);
-      return;
     }
-
-    setSuccess(true);
   };
 
   const tomorrow = new Date();
