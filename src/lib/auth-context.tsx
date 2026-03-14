@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Initialize Supabase on mount (client-side only)
   useEffect(() => {
     if (!supabase) {
-      supabase = initSupabase()
+      supabase = initSupabase() as any
     }
   }, [])
 
