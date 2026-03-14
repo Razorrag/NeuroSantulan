@@ -16,7 +16,7 @@ interface Service {
 }
 
 export default function BookAppointmentPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, userProfile, loading: authLoading } = useAuth();
   const router = useRouter();
 
   // Initialize Supabase client
