@@ -365,6 +365,12 @@ function OtherServices({ currentServiceId }: { currentServiceId: string }) {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Initialize Supabase client
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+
   useEffect(() => {
     const fetchServices = async () => {
       const { data, error } = await supabase
