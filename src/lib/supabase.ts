@@ -1,29 +1,42 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-// Use environment variables with fallback for build time
-const getSupabaseUrl = () => {
-  if (typeof window !== 'undefined') {
-    // Client-side: always available
-    return process.env.NEXT_PUBLIC_SUPABASE_URL!
+// Lazy initialization to avoid issues during static generation
+let _supabase: SupabaseClient | null = null
+let _serverClient: SupabaseClient | null = null
+
+const getCredentials = () => {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  
+  // During build/static generation, these might be empty
+  if (!url || !key) {
+    return null
   }
-  // Server-side/build: may not be available during static generation
-  return process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+  
+  return { url, key }
 }
 
-const getSupabaseKey = () => {
-  if (typeof window !== 'undefined') {
-    return process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+// Lazy initialization - only create client when actually used
+export const supabase = {
+  getInstance: (): SupabaseClient | null => {
+    if (!_supabase) {
+      const creds = getCredentials()
+      if (!creds) return null
+      _supabase = createClient(creds.url, creds.key)
+    }
+    return _supabase
   }
-  return process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 }
-
-const supabaseUrl = getSupabaseUrl()
-const supabaseAnonKey = getSupabaseKey()
-
-// Create client - will work in browser, may be empty during build
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // For server-side operations
-export const createServerClient = () => {
-  return createClient(supabaseUrl, supabaseAnonKey)
+export const createServerClient = (): SupabaseClient | null => {
+  if (!_serverClient) {
+    const creds = getCredentials()
+    if (!creds) return null
+    _serverClient = createClient(creds.url, creds.key)
+  }
+  return _serverClient
 }
+
+// Default export for backward compatibility
+export default supabase

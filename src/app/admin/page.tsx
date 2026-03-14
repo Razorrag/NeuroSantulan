@@ -17,7 +17,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 import { AnimatedCard } from '@/components/ui/animated-card';
 import { Skeleton, StatCardSkeleton, AppointmentSkeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
@@ -53,6 +53,12 @@ type StatusFilter = typeof statusFilters[number];
 export default function AdminPage() {
   const { user, userProfile, loading: authLoading } = useAuth();
   const router = useRouter();
+
+  // Initialize Supabase client
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
 
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
