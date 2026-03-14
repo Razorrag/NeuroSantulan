@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react'
-import { createClient, User } from '@supabase/supabase-js'
+import { createClient, User, SupabaseClient } from '@supabase/supabase-js'
 
 // Initialize Supabase client only on client-side
 const initSupabase = () => {
@@ -16,7 +16,7 @@ const initSupabase = () => {
   return createClient(url, key)
 }
 
-let supabase: ReturnType<typeof createClient> | null = null
+let supabase: SupabaseClient | null = null
 
 interface AuthContextType {
   user: User | null
@@ -144,7 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Create user profile in database
     if (data.user) {
-      const { error: profileError } = await supabase.from('users').insert({
+      const { error: profileError } = await supabase!.from('users').insert({
         id: data.user.id,
         email: userData.email,
         username: userData.username,
@@ -153,7 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         date_of_birth: userData.date_of_birth || null,
         gender: userData.gender || null,
         role: 'user',
-      })
+      } as any)
 
       if (profileError) return { error: profileError }
     }
