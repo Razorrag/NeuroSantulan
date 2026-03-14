@@ -1,10 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 import { CheckCircle2, XCircle, Loader } from 'lucide-react';
 
 export default function TestConnectionPage() {
+  // Initialize Supabase client
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
   const [tests, setTests] = useState<Array<{
     name: string;
     status: 'pending' | 'success' | 'error';
