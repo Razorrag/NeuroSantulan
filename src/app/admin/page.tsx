@@ -87,25 +87,43 @@ export default function AdminPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
 
+    // Fetch users with error handling
     const { data: usersData, error: usersError } = await supabase
       .from('users')
       .select('*')
       .order('created_at', { ascending: false });
-    
-    if (usersData) setUsers(usersData);
-    if (usersError) toast.error('Failed to load users');
 
+    if (usersError) {
+      console.error('Users fetch error:', usersError);
+      // Only show toast for non-permission errors
+      if (!usersError.message?.includes('policy')) {
+        toast.error('Failed to load users');
+      }
+      setUsers([]);
+    } else if (usersData) {
+      setUsers(usersData);
+    }
+
+    // Fetch appointments with LEFT JOINs to handle missing related data
     const { data: appointmentsData, error: appointmentsError } = await supabase
       .from('appointments')
       .select(`
         *,
-        service:services(name),
-        user:users(username, email)
+        service:services!left(name),
+        user:users!left(username, email)
       `)
       .order('appointment_date', { ascending: false });
 
-    if (appointmentsData) setAppointments(appointmentsData);
-    if (appointmentsError) toast.error('Failed to load appointments');
+    if (appointmentsError) {
+      console.error('Appointments fetch error:', appointmentsError);
+      // Only show toast for non-permission errors
+      if (!appointmentsError.message?.includes('policy')) {
+        toast.error('Failed to load appointments');
+      }
+      setAppointments([]);
+    } else if (appointmentsData) {
+      setAppointments(appointmentsData);
+    }
 
     setLoading(false);
   }, []);
@@ -494,9 +512,14 @@ export default function AdminPage() {
                             {appointment.service?.name || 'Session'}
                           </h3>
                           <p className="mt-1 text-sm text-slate-700">
-                            <span className="font-medium">{appointment.user?.username || 'Unknown user'}</span>
-                            {appointment.user?.email && (
+                            <span className="font-medium">
+                              {appointment.user?.username || appointment.user?.email || 'Unknown user'}
+                            </span>
+                            {appointment.user?.email && appointment.user?.username && (
                               <span className="text-slate-500"> • {appointment.user.email}</span>
+                            )}
+                            {!appointment.user && (
+                              <span className="text-slate-400"> • User data unavailable</span>
                             )}
                           </p>
                           <div className="mt-3 flex flex-wrap gap-3 text-sm text-slate-700">
