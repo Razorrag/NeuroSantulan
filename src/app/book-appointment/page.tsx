@@ -3,9 +3,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Calendar, Check, Clock3, FileText, Stethoscope } from 'lucide-react';
+import { ArrowLeft, Calendar, Check, Clock3, FileText, Stethoscope, AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
-import { createClient } from '@supabase/supabase-js';
+import { BusinessRules } from '@/lib/business-rules';
+import { Validators } from '@/lib/validators';
+import { ErrorHandler, AppError } from '@/lib/error-handler';
+import { supabase as supabaseLib } from '@/lib/supabase';
 
 interface Service {
   id: string;
@@ -13,28 +16,47 @@ interface Service {
   description: string;
   duration_minutes: number;
   price: number;
+  is_active: boolean;
+}
+
+interface BookingFormData {
+  service_id: string;
+  appointment_date: string;
+  appointment_time: string;
+  notes: string;
 }
 
 export default function BookAppointmentPage() {
   const { user, userProfile, loading: authLoading } = useAuth();
   const router = useRouter();
 
-  // Initialize Supabase client
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  // Get Supabase client from centralized instance
+  const supabase = supabaseLib.getInstance();
+  
+  // Early return if Supabase is not initialized
+  if (!supabase) {
+    return (
+      <div className="app-shell flex items-center justify-center">
+        <div className="text-slate-700">Supabase not initialized</div>
+      </div>
+    );
+  }
 
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<BookingFormData>({
     service_id: '',
     appointment_date: '',
     appointment_time: '',
     notes: '',
   });
+  
+  // Validation and business rule states
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [businessRuleWarnings, setBusinessRuleWarnings] = useState<string[]>([]);
+  const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -46,13 +68,25 @@ export default function BookAppointmentPage() {
   }, [user, userProfile, authLoading, router]);
 
   const fetchServices = useCallback(async () => {
-    const { data, error } = await supabase.from('services').select('*').eq('is_active', true).order('name');
+    try {
+      const { data, error } = await supabase.from('services').select('*').eq('is_active', true).order('name');
 
-    if (!error && data) {
-      setServices(data);
+      if (error) {
+        const appError = ErrorHandler.handleDatabaseError(error);
+        ErrorHandler.showToastError(appError);
+        return;
+      }
+
+      if (data) {
+        setServices(data);
+      }
+    } catch (err: any) {
+      const appError = ErrorHandler.handleDatabaseError(err);
+      ErrorHandler.showToastError(appError);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -62,9 +96,81 @@ export default function BookAppointmentPage() {
     return () => clearTimeout(timeoutId);
   }, [fetchServices]);
 
+  const validateForm = useCallback(() => {
+    const errors: string[] = [];
+    
+    // Basic validation
+    const validation = Validators.validateAllAppointmentData(formData);
+    errors.push(...validation.errors);
+    
+    // Additional business rule validation
+    if (formData.service_id && services.length > 0) {
+      const selectedService = services.find(s => s.id === formData.service_id);
+      if (!selectedService) {
+        errors.push('Selected service is not available');
+      } else if (!selectedService.is_active) {
+        errors.push('Selected service is currently unavailable');
+      }
+    }
+    
+    setValidationErrors(errors);
+    return errors.length === 0;
+  }, [formData, services]);
+
+  const checkBusinessRules = useCallback(async () => {
+    if (!formData.service_id || !formData.appointment_date || !formData.appointment_time) {
+      setBusinessRuleWarnings([]);
+      return true;
+    }
+
+    setIsCheckingAvailability(true);
+    setBusinessRuleWarnings([]);
+
+    try {
+      const businessRules = new BusinessRules(supabase);
+      const result = await businessRules.validateAppointmentBooking(
+        user!.id,
+        formData.service_id,
+        formData.appointment_date,
+        formData.appointment_time
+      );
+
+      if (!result.isValid) {
+        const error = BusinessRules.formatBusinessRuleError(result.conflicts);
+        ErrorHandler.showToastError(error);
+        return false;
+      }
+
+      if (result.warnings.length > 0) {
+        setBusinessRuleWarnings(result.warnings);
+        result.warnings.forEach(warning => ErrorHandler.showToastWarning(warning));
+      }
+
+      return true;
+    } catch (err: any) {
+      const appError = ErrorHandler.handleDatabaseError(err);
+      ErrorHandler.showToastError(appError);
+      return false;
+    } finally {
+      setIsCheckingAvailability(false);
+    }
+  }, [formData, supabase, user]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+
+    // Validate form
+    if (!validateForm()) {
+      ErrorHandler.showToastError(new AppError('VALIDATION_ERROR', 'Please fix the validation errors', 'Please fix the validation errors'));
+      return;
+    }
+
+    // Check business rules
+    const businessRulesValid = await checkBusinessRules();
+    if (!businessRulesValid) {
+      return;
+    }
 
     setSubmitting(true);
 
@@ -78,13 +184,33 @@ export default function BookAppointmentPage() {
         status: 'pending',
       });
 
-      if (error) throw error;
+      if (error) {
+        const appError = ErrorHandler.handleDatabaseError(error);
+        ErrorHandler.showToastError(appError);
+        setSubmitting(false);
+        return;
+      }
 
+      ErrorHandler.showToastSuccess('Appointment booked successfully!');
       setSuccess(true);
     } catch (err: any) {
-      console.error('Booking error:', err);
-      toast.error(err.message || 'Failed to book appointment. Please try again.');
+      const appError = ErrorHandler.handleDatabaseError(err);
+      ErrorHandler.showToastError(appError);
       setSubmitting(false);
+    }
+  };
+
+  const handleInputChange = (field: keyof BookingFormData, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    
+    // Clear validation errors when user starts typing
+    if (validationErrors.length > 0) {
+      setValidationErrors([]);
+    }
+    
+    // Clear warnings when user changes date/time
+    if ((field === 'appointment_date' || field === 'appointment_time') && businessRuleWarnings.length > 0) {
+      setBusinessRuleWarnings([]);
     }
   };
 
@@ -152,6 +278,24 @@ export default function BookAppointmentPage() {
               <p className="mt-2 text-sm leading-6 text-slate-700">Everything here is sized to stay readable without wasting space.</p>
             </div>
 
+            {/* Validation Errors */}
+            {validationErrors.length > 0 && (
+              <div className="mb-4 rounded-xl border border-rose-400/25 bg-rose-400/12 px-4 py-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-rose-950">
+                  <AlertCircle className="h-4 w-4" />
+                  Please fix the following errors:
+                </div>
+                <ul className="mt-2 space-y-1 text-sm text-rose-800">
+                  {validationErrors.map((error, index) => (
+                    <li key={index} className="flex items-start gap-2">
+                      <span className="mt-0.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-rose-500" />
+                      {error}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <div className="space-y-3">
               {services.map((service) => (
                 <label
@@ -167,7 +311,7 @@ export default function BookAppointmentPage() {
                     name="service_id"
                     value={service.id}
                     checked={formData.service_id === service.id}
-                    onChange={(e) => setFormData({ ...formData, service_id: e.target.value })}
+                    onChange={(e) => handleInputChange('service_id', e.target.value)}
                     className="sr-only"
                     required
                   />
@@ -196,9 +340,9 @@ export default function BookAppointmentPage() {
                   <input
                     type="date"
                     value={formData.appointment_date}
-                    onChange={(e) => setFormData({ ...formData, appointment_date: e.target.value })}
+                    onChange={(e) => handleInputChange('appointment_date', e.target.value)}
                     min={minDate}
-                    className="control"
+                    className={`control ${validationErrors.some(e => e.includes('date')) ? 'border-rose-400' : ''}`}
                     required
                   />
                 </div>
@@ -211,7 +355,7 @@ export default function BookAppointmentPage() {
                     <button
                       key={time}
                       type="button"
-                      onClick={() => setFormData({ ...formData, appointment_time: time })}
+                      onClick={() => handleInputChange('appointment_time', time)}
                       className={`rounded-xl border px-3 py-3 text-sm font-medium transition ${
                         formData.appointment_time === time
                           ? 'border-orange-300/70 bg-orange-400/18 text-slate-950'
@@ -231,7 +375,7 @@ export default function BookAppointmentPage() {
                 <FileText className="input-icon top-4" />
                 <textarea
                   value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  onChange={(e) => handleInputChange('notes', e.target.value)}
                   rows={5}
                   className="control min-h-[8rem] resize-none"
                   placeholder="Add any context the therapist should know before the session."
@@ -239,14 +383,44 @@ export default function BookAppointmentPage() {
               </div>
             </div>
 
+            {/* Business Rule Warnings */}
+            {businessRuleWarnings.length > 0 && (
+              <div className="mt-4 rounded-xl border border-amber-400/25 bg-amber-400/12 px-4 py-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-amber-950">
+                  <AlertCircle className="h-4 w-4" />
+                  Booking recommendations:
+                </div>
+                <ul className="mt-2 space-y-1 text-sm text-amber-800">
+                  {businessRuleWarnings.map((warning, index) => (
+                    <li key={index} className="flex items-start gap-2">
+                      <span className="mt-0.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-500" />
+                      {warning}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
               <Link href="/profile" className="secondary-button">Cancel</Link>
               <button
                 type="submit"
-                disabled={submitting || !formData.service_id || !formData.appointment_date || !formData.appointment_time}
+                disabled={submitting || !formData.service_id || !formData.appointment_date || !formData.appointment_time || isCheckingAvailability}
                 className="primary-button disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {submitting ? 'Submitting...' : 'Confirm booking'}
+                {submitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Submitting...
+                  </>
+                ) : isCheckingAvailability ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Checking availability...
+                  </>
+                ) : (
+                  'Confirm booking'
+                )}
               </button>
             </div>
           </form>

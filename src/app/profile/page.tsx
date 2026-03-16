@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, Brain, Calendar, CheckCircle2, Clock3, FileText, LogOut, Plus, Settings, Target, User, X } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
-import { createClient } from '@supabase/supabase-js';
+import { supabase as supabaseLib } from '@/lib/supabase';
 
 interface Appointment {
   id: string;
@@ -30,11 +30,17 @@ export default function ProfilePage() {
   const { user, userProfile, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
 
-  // Initialize Supabase client
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  // Get Supabase client from centralized instance
+  const supabase = supabaseLib.getInstance();
+  
+  // Early return if Supabase is not initialized
+  if (!supabase) {
+    return (
+      <div className="app-shell flex items-center justify-center">
+        <div className="text-slate-700">Supabase not initialized</div>
+      </div>
+    );
+  }
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);

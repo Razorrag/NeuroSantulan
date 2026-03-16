@@ -17,7 +17,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
-import { createClient } from '@supabase/supabase-js';
+import { supabase as supabaseLib } from '@/lib/supabase';
 import { AnimatedCard } from '@/components/ui/animated-card';
 import { Skeleton, StatCardSkeleton, AppointmentSkeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
@@ -54,11 +54,17 @@ export default function AdminPage() {
   const { user, userProfile, loading: authLoading } = useAuth();
   const router = useRouter();
 
-  // Initialize Supabase client
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  // Get Supabase client from centralized instance
+  const supabase = supabaseLib.getInstance();
+  
+  // Early return if Supabase is not initialized
+  if (!supabase) {
+    return (
+      <div className="app-shell flex items-center justify-center">
+        <div className="text-slate-700">Supabase not initialized</div>
+      </div>
+    );
+  }
 
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
